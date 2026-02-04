@@ -1,0 +1,326 @@
+
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Max Math Challenge Pro</title>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(180deg, #d8d2e1 0%, #b8b1c5 100%);
+            --card-bg: #f3f0f7;
+            --primary-purple: #8e7cc3;
+            --dark-red: #7c4d52;
+            --yellow: #ffd966;
+            --success: #4caf50;
+            --error: #ff4d4d;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-gradient);
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #333;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 380px;
+            background: rgba(255, 255, 255, 0.3);
+            padding: 25px;
+            border-radius: 30px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .header-box {
+            background: var(--card-bg);
+            border: 3px solid var(--primary-purple);
+            border-radius: 20px;
+            padding: 10px;
+            margin-bottom: 15px;
+        }
+
+        .difficulty-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .diff-btn {
+            background: white;
+            border: 2px solid transparent;
+            padding: 12px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        .diff-btn.active {
+            border-color: var(--primary-purple);
+            background: var(--primary-purple);
+            color: white;
+        }
+
+        .info-card {
+            background: white;
+            border-radius: 15px;
+            padding: 10px;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .start-btn {
+            background: var(--dark-red);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 50px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        #game-screen { display: none; }
+        .timer { font-size: 2.5rem; color: #cc0000; font-weight: bold; }
+        .timer.penalty { color: var(--error); transform: scale(1.3); transition: 0.2s; }
+        .math-problem { font-size: 2.2rem; margin: 20px 0; font-weight: bold; min-height: 80px; display: flex; align-items: center; justify-content: center; word-break: break-all; }
+        .answer-input {
+            font-size: 2rem;
+            width: 160px;
+            text-align: center;
+            border-radius: 15px;
+            border: 3px solid var(--primary-purple);
+            outline: none;
+        }
+
+        .arena-info { color: var(--primary-purple); font-weight: bold; font-size: 0.9rem; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+    <div id="menu-screen" class="container">
+        <div class="header-box">
+            <h1 style="margin:0; font-size: 1.8rem; color: #d4a017;">Max Math Pro</h1>
+            <p style="margin:0;">High Score System 🏆</p>
+        </div>
+
+        <div class="difficulty-grid">
+            <button class="diff-btn active" onclick="selectDiff('Easy')">Easy</button>
+            <button class="diff-btn" onclick="selectDiff('Medium')">Medium</button>
+            <button class="diff-btn" onclick="selectDiff('Hard')">Hard</button>
+            <button class="diff-btn" onclick="selectDiff('Arena')">Arena</button>
+        </div>
+
+        <div class="info-card" id="diff-desc">👶 Χωρίς χρόνο. Πρόσθεση/Αφαίρεση.</div>
+
+        <div class="info-card" style="text-align: left;">
+            <div>🏆 Easy: <span id="score-Easy">0</span></div>
+            <div>🏆 Medium: <span id="score-Medium">0</span></div>
+            <div>🏆 Hard: <span id="score-Hard">0</span></div>
+            <div>🏆 Arena: <span id="score-Arena">0</span></div>
+        </div>
+
+        <button class="start-btn" onclick="startGame()">START GAME 🕹️</button>
+    </div>
+
+    <div id="game-screen" class="container">
+        <div id="timer-display" class="timer">60</div>
+        <div id="arena-lvl" class="arena-info" style="display:none;">Επίπεδο Arena: 2 Αριθμοί</div>
+        <div id="problem" class="math-problem">--</div>
+        <input type="number" id="answer" class="answer-input" placeholder="?" autocomplete="off">
+        <p>Score: <span id="current-score" style="font-weight:bold;">0</span></p>
+        <button onclick="backToMenu()" style="background:none; border:none; color:gray; cursor:pointer; text-decoration:underline;">Έξοδος</button>
+    </div>
+
+    <script>
+        let currentDifficulty = 'Easy';
+        let score = 0;
+        let timeLeft = 60;
+        let timerInterval;
+        let currentAnswer;
+        let arenaNumbersCount = 2;
+
+        const difficulties = ['Easy', 'Medium', 'Hard', 'Arena'];
+        difficulties.forEach(d => {
+            document.getElementById(`score-${d}`).innerText = localStorage.getItem(`highScore_${d}`) || 0;
+        });
+
+        function selectDiff(level) {
+            currentDifficulty = level;
+            document.querySelectorAll('.diff-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if(btn.innerText === level) btn.classList.add('active');
+            });
+
+            const desc = document.getElementById('diff-desc');
+            if(level === 'Easy') desc.innerHTML = "👶 <strong>Easy</strong>: Χωρίς χρόνο. Πράξεις (1-20).";
+            else if(level === 'Medium') desc.innerHTML = "😐 <strong>Medium</strong>: 60\". Λάθος = -10\" & Νέα πράξη.";
+            else if(level === 'Hard') desc.innerHTML = "🔥 <strong>Hard</strong>: 60\". Λάθος = -10\" & Νέα πράξη.";
+            else desc.innerHTML = "💀 <strong>Arena</strong>: 60\". Σωστό = Reset 60\" & +1 Αριθμός. Λάθος = -10\".";
+        }
+
+        function startGame() {
+            document.getElementById('menu-screen').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'block';
+
+            score = 0;
+            arenaNumbersCount = 2;
+            document.getElementById('current-score').innerText = score;
+            document.getElementById('arena-lvl').style.display = (currentDifficulty === 'Arena') ? 'block' : 'none';
+
+            if(currentDifficulty === 'Easy') {
+                document.getElementById('timer-display').innerText = "∞";
+                clearInterval(timerInterval);
+            } else {
+                timeLeft = 60;
+                document.getElementById('timer-display').innerText = timeLeft;
+                startTimer();
+            }
+
+            nextProblem();
+            document.getElementById('answer').value = '';
+            document.getElementById('answer').focus();
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer-display').innerText = timeLeft;
+                if(timeLeft <= 0) {
+                    timeLeft = 0;
+                    document.getElementById('timer-display').innerText = 0;
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function nextProblem() {
+            let problemText = "";
+
+            if (currentDifficulty === 'Arena') {
+                let numbers = [];
+                for(let i=0; i < arenaNumbersCount; i++) {
+                    numbers.push(Math.floor(Math.random() * 10) + 2);
+                }
+                currentAnswer = numbers.reduce((a, b) => a + b, 0);
+                problemText = numbers.join(" + ");
+                document.getElementById('arena-lvl').innerText = `Επίπεδο Arena: ${arenaNumbersCount} Αριθμοί`;
+            }
+            else {
+                let n1, n2, op;
+                if (currentDifficulty === 'Easy') {
+                    n1 = Math.floor(Math.random() * 15) + 5;
+                    n2 = Math.floor(Math.random() * 10) + 1;
+                    op = Math.random() > 0.5 ? '+' : '-';
+                    if(op === '-') n1 = n1 + n2;
+                    currentAnswer = (op === '+') ? n1 + n2 : n1 - n2;
+                    problemText = `${n1} ${op} ${n2}`;
+                } else if (currentDifficulty === 'Medium') {
+                    n1 = Math.floor(Math.random() * 10) + 2;
+                    n2 = Math.floor(Math.random() * 10) + 2;
+                    currentAnswer = n1 * n2;
+                    problemText = `${n1} × ${n2}`;
+                } else {
+                    const ops = ['+', '-', '*', '/'];
+                    op = ops[Math.floor(Math.random() * ops.length)];
+                    if(op === '/') {
+                        n2 = Math.floor(Math.random() * 9) + 2;
+                        n1 = n2 * (Math.floor(Math.random() * 10) + 2);
+                        currentAnswer = n1 / n2;
+                        problemText = `${n1} ÷ ${n2}`;
+                    } else if(op === '*') {
+                        n1 = Math.floor(Math.random() * 15) + 2;
+                        n2 = Math.floor(Math.random() * 12) + 2;
+                        currentAnswer = n1 * n2;
+                        problemText = `${n1} × ${n2}`;
+                    } else {
+                        n1 = Math.floor(Math.random() * 80) + 20;
+                        n2 = Math.floor(Math.random() * 80) + 20;
+                        if(op === '-') n1 = n1 + n2;
+                        currentAnswer = (op === '+') ? n1 + n2 : n1 - n2;
+                        problemText = `${n1} ${op} ${n2}`;
+                    }
+                }
+            }
+            document.getElementById('problem').innerText = problemText;
+            document.getElementById('answer').value = '';
+        }
+
+        document.getElementById('answer').oninput = function() {
+            let val = parseInt(this.value);
+            if(isNaN(val)) return;
+
+            if(val === currentAnswer) {
+                score++;
+                document.getElementById('current-score').innerText = score;
+
+                if(currentDifficulty === 'Arena') {
+                    arenaNumbersCount++;
+                    timeLeft = 60;
+                    document.getElementById('timer-display').innerText = timeLeft;
+                }
+                nextProblem();
+            }
+            // Αν ο χρήστης έγραψε λάθος απάντηση (ίδιο ή μεγαλύτερο μήκος ψηφίων)
+            else if(this.value.length >= currentAnswer.toString().length) {
+                if(currentDifficulty !== 'Easy') {
+                    handleWrongAnswer();
+                }
+            }
+        };
+
+        // Υποστήριξη και για το κουμπί Enter στο πληκτρολόγιο
+        document.getElementById('answer').onkeydown = function(e) {
+            if(e.key === "Enter") {
+                if(parseInt(this.value) !== currentAnswer && currentDifficulty !== 'Easy') {
+                    handleWrongAnswer();
+                }
+            }
+        };
+
+        function handleWrongAnswer() {
+            timeLeft -= 10;
+            if(timeLeft < 0) timeLeft = 0;
+            document.getElementById('timer-display').innerText = timeLeft;
+
+            const timerEl = document.getElementById('timer-display');
+            timerEl.classList.add('penalty');
+            setTimeout(() => timerEl.classList.remove('penalty'), 300);
+
+            // Αλλαγή πράξης επειδή έκανε λάθος
+            nextProblem();
+        }
+
+        function endGame() {
+            clearInterval(timerInterval);
+            alert("ΤΕΛΟΣ ΠΑΙΧΝΙΔΙΟΥ! Σκορ: " + score);
+
+            const key = `highScore_${currentDifficulty}`;
+            const best = parseInt(localStorage.getItem(key)) || 0;
+            if(score > best) {
+                localStorage.setItem(key, score);
+                document.getElementById(`score-${currentDifficulty}`).innerText = score;
+                alert("Νέο High Score! 🎉");
+            }
+            backToMenu();
+        }
+
+        function backToMenu() {
+            clearInterval(timerInterval);
+            document.getElementById('menu-screen').style.display = 'block';
+            document.getElementById('game-screen').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
